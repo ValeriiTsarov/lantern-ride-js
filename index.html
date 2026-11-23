@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Lantern Ride</title>
+<script type="importmap">
+{ "imports": {
+  "three": "./node_modules/three/build/three.module.js",
+  "three/addons/": "./node_modules/three/examples/jsm/"
+} }
+</script>
+<style>
+  /* Baloo 2 (SIL OFL 1.1, Google Fonts) — локально: портали (Poki) забороняють зовнішні запити. Змінний шрифт 400–800. */
+  @font-face { font-family: 'Baloo 2'; font-weight: 400 800; font-display: swap; src: url(public/fonts/baloo2-latin.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  @font-face { font-family: 'Baloo 2'; font-weight: 400 800; font-display: swap; src: url(public/fonts/baloo2-latin-ext.woff2) format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+  :root { --ui: #fff7ec; --ink: #2a1d3d; --oil: #ffb347; --bad: #ff5a7a; --panel: rgba(28, 20, 48, .86); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #141029; color: var(--ui); font-family: 'Baloo 2', system-ui, sans-serif; user-select: none; -webkit-user-select: none; touch-action: none; }
+  #c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #touch { position: fixed; inset: 0; z-index: 1; }
+  .hud { position: fixed; z-index: 3; pointer-events: none; }
+  .hud * { pointer-events: auto; }
+  #top { top: max(10px, env(safe-area-inset-top)); left: 12px; right: 12px; display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .pill { background: rgba(20, 14, 38, .62); border: 2px solid rgba(255, 255, 255, .12); border-radius: 18px; padding: 6px 12px; display: flex; align-items: center; gap: 8px; backdrop-filter: blur(6px); box-shadow: 0 4px 14px rgba(0, 0, 0, .25); }
+  #oil { width: min(38vw, 220px); }
+  #oil .bar { flex: 1; height: 14px; border-radius: 8px; background: rgba(255, 255, 255, .12); overflow: hidden; position: relative; }
+  #oil .fill { position: absolute; inset: 0 auto 0 0; width: 100%; background: linear-gradient(90deg, #ff8a3d, #ffd36b); border-radius: 8px; box-shadow: 0 0 12px #ffb347; transition: width .08s linear; }
+  #oil.low .fill { background: linear-gradient(90deg, #ff4d6d, #ff9a5a); animation: blink .35s infinite alternate; }
+  #oil.low { animation: shakeX .3s infinite; }
+  @keyframes blink { to { opacity: .45; } }
+  @keyframes shakeX { 25% { transform: translateX(-2px); } 75% { transform: translateX(2px); } }
+  .ico { font-size: 20px; line-height: 1; filter: drop-shadow(0 0 6px rgba(255, 190, 90, .7)); }
+  #flare.used { opacity: .3; filter: grayscale(1); }
+  #houses { gap: 6px; }
+  #houses i { width: 22px; height: 22px; display: inline-block; font-style: normal; text-align: center; line-height: 22px; font-size: 18px; filter: grayscale(1) brightness(.6); transition: .3s; }
+  #houses i.on { filter: drop-shadow(0 0 8px #ffc060); transform: scale(1.15); }
+  #houses i.next { filter: grayscale(.4) brightness(.9); animation: pulse 1s infinite alternate; }
+  @keyframes pulse { to { transform: scale(1.12); } }
+  #right { display: flex; gap: 8px; align-items: center; }
+  #coins b { font-size: 20px; min-width: 2.5ch; text-align: right; }
+  #coins.pop { animation: pop .2s; }
+  @keyframes pop { 50% { transform: scale(1.18); } }
+  .btn { background: rgba(20, 14, 38, .62); color: var(--ui); border: 2px solid rgba(255, 255, 255, .14); border-radius: 14px; width: 42px; height: 42px; font-size: 19px; cursor: pointer; display: grid; place-items: center; font-family: inherit; }
+  .btn:hover { background: rgba(60, 40, 100, .8); }
+  #hint { position: fixed; z-index: 3; left: 50%; top: 22%; transform: translateX(-50%); font-size: clamp(18px, 3vw, 28px); font-weight: 800; text-shadow: 0 2px 0 #2a1d3d, 0 0 18px rgba(255, 200, 120, .6); pointer-events: none; opacity: 0; transition: opacity .3s; text-align: center; padding: 0 16px; }
+  #hint.on { opacity: 1; }
+  #shadeWarn { position: fixed; z-index: 2; left: 0; right: 0; bottom: 0; height: 28vh; pointer-events: none; opacity: 0; background: linear-gradient(to top, rgba(255, 40, 110, .55), rgba(120, 20, 120, .2) 50%, transparent); transition: opacity .2s; }
+  #shadeWarn.on { opacity: 1; animation: blink .25s infinite alternate; }
+  #shadeWarn.chase { opacity: 1; animation: none; background: linear-gradient(to top, rgba(40, 0, 60, .5), transparent); }
+  #joy { position: fixed; z-index: 4; display: none; transform: translate(-50%, -50%); border-radius: 50%; border: 3px solid rgba(255, 255, 255, .35); background: rgba(255, 255, 255, .06); pointer-events: none; }
+  #knob { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #ffd6a0 60%, #ff9a4a); box-shadow: 0 0 18px rgba(255, 180, 90, .8); }
+  #tut { position: fixed; z-index: 3; left: 50%; bottom: 16%; width: 160px; height: 120px; margin-left: -80px; pointer-events: none; opacity: 0; transition: opacity .4s; }
+  #tut.on { opacity: 1; }
+  #tut .finger { position: absolute; left: 60px; top: 40px; font-size: 44px; animation: swipe 2.4s infinite ease-in-out; filter: drop-shadow(0 2px 6px rgba(0,0,0,.5)); }
+  #tut .trail { position: absolute; left: 10px; right: 10px; top: 62px; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .35); }
+  @keyframes swipe { 0% { transform: translate(0, 0); } 20% { transform: translate(-50px, 0); } 45% { transform: translate(50px, 0); } 60% { transform: translate(0, 0); } 85% { transform: translate(0, -60px); } 100% { transform: translate(0, 0); } }
+  .modal { position: fixed; inset: 0; z-index: 10; display: none; place-items: center; background: rgba(12, 6, 26, .55); backdrop-filter: blur(3px); }
+  .modal.on { display: grid; }
+  .card { background: var(--panel); border: 2px solid rgba(255, 255, 255, .12); border-radius: 26px; padding: 22px 26px; min-width: min(86vw, 320px); text-align: center; box-shadow: 0 20px 60px rgba(0, 0, 0, .5); animation: cardIn .25s ease-out; }
+  @keyframes cardIn { from { transform: scale(.85); opacity: 0; } }
+  .card h2 { margin: 0 0 6px; font-size: 34px; line-height: 1.1; color: #ffd38a; text-shadow: 0 0 20px rgba(255, 180, 90, .5); }
+  .card p { margin: 4px 0 14px; opacity: .85; }
+  .big { font-family: inherit; font-size: 20px; font-weight: 800; border: 0; border-radius: 16px; padding: 12px 28px; margin: 6px; cursor: pointer; color: var(--ink); background: linear-gradient(#ffe2a0, #ffb052); box-shadow: 0 4px 0 #c86f22, 0 8px 18px rgba(0, 0, 0, .3); }
+  .big.alt { background: linear-gradient(#e8e0ff, #b5a6ff); box-shadow: 0 4px 0 #6d5bc4, 0 8px 18px rgba(0, 0, 0, .3); }
+  .big:active { transform: translateY(3px); box-shadow: 0 1px 0 #c86f22; }
+  .stars { font-size: 44px; letter-spacing: 6px; margin: 6px 0; }
+  .stars span { filter: grayscale(1) brightness(.4); display: inline-block; }
+  .stars span.on { filter: drop-shadow(0 0 10px #ffd34a); animation: starIn .4s backwards; }
+  @keyframes starIn { from { transform: scale(0) rotate(-90deg); } }
+  .levels { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 10px 0; }
+  .levels { max-width: 470px; margin-left: auto; margin-right: auto; }
+  .levels button { width: 64px; height: 74px; border-radius: 18px; font-family: inherit; font-size: 26px; font-weight: 800; cursor: pointer; border: 2px solid rgba(255,255,255,.2); background: rgba(255, 255, 255, .08); color: var(--ui); }
+  .levels button small { display: block; font-size: 13px; }
+  .levels button:disabled { opacity: .35; cursor: default; }
+  #loading { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: radial-gradient(circle at 50% 45%, #2b1f55, #120c24); transition: opacity .5s; }
+  #loading h1 { font-size: clamp(36px, 7vw, 64px); margin: 0; color: #ffd38a; text-shadow: 0 0 30px rgba(255, 170, 80, .6); }
+  #loading .lbar { width: 220px; height: 10px; border-radius: 6px; background: rgba(255, 255, 255, .1); overflow: hidden; margin: 14px auto 0; }
+  #loading .lbar div { height: 100%; width: 0; background: linear-gradient(90deg, #ff8a3d, #ffd36b); }
+  /* панель графіки */
+  #gfx { position: fixed; z-index: 12; top: 0; right: 0; bottom: 0; width: min(380px, 100vw); background: rgba(22, 15, 40, .93); backdrop-filter: blur(10px); border-left: 2px solid rgba(255, 255, 255, .1); transform: translateX(105%); transition: transform .25s ease; display: flex; flex-direction: column; font-size: 15px; }
+  #gfx.on { transform: none; }
+  .gfx-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px 6px; font-size: 20px; }
+  .gfx-head .hint { font-size: 12px; opacity: .55; flex: 1; }
+  .gfx-x { background: none; border: 0; color: var(--ui); font-size: 20px; cursor: pointer; }
+  .gfx-tabs { display: flex; gap: 4px; padding: 6px 12px; flex-wrap: wrap; }
+  .gfx-tabs button { font-family: inherit; font-size: 14px; border: 0; border-radius: 10px; padding: 5px 10px; background: rgba(255, 255, 255, .08); color: var(--ui); cursor: pointer; }
+  .gfx-tabs button.on { background: #ffb052; color: var(--ink); font-weight: 700; }
+  .gfx-body { flex: 1; overflow-y: auto; padding: 6px 16px 12px; touch-action: pan-y; }
+  .gfx-row { display: grid; grid-template-columns: 1fr 1.25fr; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid rgba(255, 255, 255, .06); }
+  .gfx-row.wide { grid-template-columns: 1fr; }
+  .gfx-row select { font-family: inherit; font-size: 14px; background: #2e2250; color: var(--ui); border: 1px solid rgba(255, 255, 255, .2); border-radius: 8px; padding: 4px 6px; }
+  .gfx-row input[type=color] { width: 100%; height: 28px; border: 0; background: none; padding: 0; }
+  .gfx-row input[type=checkbox] { width: 20px; height: 20px; justify-self: start; accent-color: #ffb052; }
+  .gfx-range { display: flex; gap: 8px; align-items: center; }
+  .gfx-range input { flex: 1; accent-color: #ffb052; min-width: 0; }
+  .gfx-range output { width: 44px; text-align: right; font-size: 13px; opacity: .8; font-variant-numeric: tabular-nums; }
+  .gfx-swatches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .gfx-swatches .sw { background: rgba(255, 255, 255, .06); border: 2px solid transparent; border-radius: 12px; padding: 6px 2px; cursor: pointer; color: var(--ui); font-family: inherit; }
+  .gfx-swatches .sw.on { border-color: #ffb052; background: rgba(255, 176, 82, .15); }
+  .gfx-swatches i { display: block; width: 34px; height: 34px; border-radius: 50%; margin: 0 auto 2px; box-shadow: inset 0 -4px 0 rgba(0, 0, 0, .2), 0 2px 6px rgba(0, 0, 0, .3); }
+  .gfx-swatches small { font-size: 11px; }
+  .gfx-foot { padding: 10px 16px 16px; }
+  .gfx-foot button { font-family: inherit; background: rgba(255, 255, 255, .08); color: var(--ui); border: 1px solid rgba(255, 255, 255, .2); border-radius: 10px; padding: 6px 12px; cursor: pointer; }
+  @media (max-width: 560px) {
+    #top { flex-wrap: wrap; left: 8px; right: 8px; gap: 6px; }
+    #houses { order: 3; margin: 0 auto; padding: 4px 10px; }
+    #houses i { width: 18px; height: 18px; font-size: 15px; line-height: 18px; }
+    .btn { width: 34px; height: 34px; font-size: 16px; border-radius: 11px; }
+    #right { gap: 5px; flex-wrap: wrap; justify-content: flex-end; max-width: 48vw; }
+    #coins { flex-basis: 100%; justify-content: flex-end; }
+    #coins { padding: 4px 8px; }
+    #coins b { font-size: 17px; }
+    #oil { width: 34vw; }
+    .pill { padding: 4px 9px; }
+  }
+  #map { position: fixed; z-index: 3; right: 12px; top: calc(max(10px, env(safe-area-inset-top)) + 54px); width: 128px; height: 128px; border-radius: 18px; background: rgba(20, 14, 38, .62); border: 2px solid rgba(255, 255, 255, .12); backdrop-filter: blur(6px); pointer-events: none; }
+  body.menu #top, body.menu #map { display: none; }
+  #menu { position: fixed; inset: 0; z-index: 6; display: none; flex-direction: column; justify-content: space-between; align-items: center; padding: max(5vh, 20px) 16px max(5vh, 20px); pointer-events: none; text-align: center; }
+  #menu.on { display: flex; }
+  #menu > * { pointer-events: auto; }
+  #menu h1 { margin: 0; font-size: clamp(42px, 9vw, 86px); line-height: 1; color: #ffd38a; text-shadow: 0 0 34px rgba(255, 170, 80, .7), 0 4px 0 #2a1d3d; }
+  #menu .sub { margin: 4px 0 0; opacity: .8; font-size: clamp(15px, 2.4vw, 20px); }
+  .skinSel { display: flex; align-items: center; gap: 14px; justify-content: center; margin-bottom: 10px; }
+  .skinSel .btn { width: 52px; height: 52px; font-size: 30px; border-radius: 50%; }
+  .skinSel b { display: block; font-size: 26px; min-width: 7ch; }
+  .skinSel small { opacity: .6; font-size: 13px; }
+  .gfx-presets { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+  .gfx-presets select, .gfx-presets input { font-family: inherit; font-size: 14px; background: #2e2250; color: var(--ui); border: 1px solid rgba(255, 255, 255, .2); border-radius: 8px; padding: 4px 6px; flex: 1; min-width: 0; }
+  .gfx-foot .row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .gfx-foot button.primary { background: #ffb052; color: var(--ink); font-weight: 700; border-color: transparent; }
+  @media (max-width: 560px) { #map { width: 92px; height: 92px; top: calc(max(10px, env(safe-area-inset-top)) + 96px); right: 8px; border-radius: 14px; } }
+  /* магазин */
+  #shop { position: fixed; z-index: 12; top: 0; right: 0; bottom: 0; width: min(400px, 100vw); background: rgba(22, 15, 40, .93); backdrop-filter: blur(10px); border-left: 2px solid rgba(255, 255, 255, .1); transform: translateX(105%); transition: transform .25s ease; display: flex; flex-direction: column; font-size: 15px; }
+  #shop.on { transform: none; }
+  #gfx .credits { white-space: pre-wrap; font-size: 13px; line-height: 1.45; opacity: .85; user-select: text; -webkit-user-select: text; }
+  #shop .wallet { font-weight: 800; font-size: 18px; color: #ffd38a; }
+  .shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; align-content: start; }
+  .shop-card { background: rgba(255, 255, 255, .06); border: 2px solid transparent; border-radius: 16px; padding: 10px 6px 8px; text-align: center; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .shop-card:hover { background: rgba(255, 255, 255, .1); }
+  .shop-card.sel { border-color: rgba(255, 255, 255, .45); }
+  .shop-card.on { border-color: #ffb052; background: rgba(255, 176, 82, .15); }
+  .shop-card i { display: block; width: 52px; height: 52px; border-radius: 50%; box-shadow: inset 0 -5px 0 rgba(0, 0, 0, .2), 0 2px 8px rgba(0, 0, 0, .35); }
+  .shop-card.locked i { filter: saturate(.55) brightness(.8); }
+  .shop-card b { font-size: 13px; line-height: 1.15; min-height: 2.3em; display: grid; place-items: center; }
+  .shop-btn { font-family: inherit; font-size: 13px; font-weight: 800; border: 0; border-radius: 10px; padding: 4px 10px; cursor: pointer; background: rgba(255, 255, 255, .14); color: var(--ui); width: 100%; }
+  .shop-btn.buy { background: linear-gradient(#ffe2a0, #ffb052); color: var(--ink); }
+  .shop-btn.poor { opacity: .55; }
+  .shop-btn.on { background: transparent; color: #ffd38a; cursor: default; }
+  .shop-btn.shake { animation: shakeX .3s 2; }
+  .shop-foot { font-size: 12px; opacity: .6; }
+  .menuWallet { font-size: 20px; font-weight: 800; color: #ffd38a; margin-bottom: 6px; text-shadow: 0 2px 0 #2a1d3d; }
+  /* FPS як у Мурахах: жирний білий з чорним контуром; лівий нижній кут поверх усього (меню, пауза, магазин), під лоадером */
+  #fps { position: fixed; z-index: 15; left: 12px; bottom: max(10px, env(safe-area-inset-bottom)); font: 700 18px/1 system-ui, sans-serif; color: #fff; -webkit-text-stroke: 4px #000; paint-order: stroke fill; pointer-events: none; padding-left: 4px; }
+</style>
+</head>
+<body class="menu">
+<canvas id="c"></canvas>
+<div id="touch"></div>
+<div id="shadeWarn"></div>
+<div id="joy"><div id="knob"></div></div>
+<div id="top" class="hud">
+  <div style="display:flex;flex-direction:column;gap:6px">
+    <div id="oil" class="pill"><span class="ico">🔋</span><div class="bar"><div class="fill"></div></div></div>
+    <div class="pill" style="align-self:flex-start"><span id="flare" class="ico" data-i18n-title="title.flare">🎆</span></div>
+      </div>
+  <div id="houses" class="pill"></div>
+  <div id="right">
+    <div id="coins" class="pill"><span class="ico">🪙</span><b>0</b></div>
+    <button class="btn" id="bPause" data-i18n-title="title.pause">⏸</button>
+    <button class="btn" id="bSound" data-i18n-title="title.sound">🔊</button>
+    <button class="btn" id="bHudShop" data-i18n-title="menu.shop">🛒</button>
+    <button class="btn" id="bLevels" data-i18n-title="title.levels">☰</button>
+    <button class="btn" id="bGfx" data-i18n-title="title.settings">⚙</button>
+  </div>
+</div>
+<canvas id="map" width="256" height="256"></canvas>
+<div id="fps"></div>
+<div id="menu" class="on">
+  <div><h1>Lantern Ride</h1><p class="sub" data-i18n="menu.sub"></p></div>
+  <div>
+    <div class="skinSel"><button class="btn" id="skPrev" data-i18n-title="title.prev">‹</button><div><b id="skName"></b><small data-i18n="menu.skinHint"></small></div><button class="btn" id="skNext" data-i18n-title="title.next">›</button></div>
+    <div class="menuWallet">🪙 <span id="wallet">0</span></div>
+    <button class="big" id="bPlay" data-i18n="menu.play"></button><button class="big alt" id="bMenuLevels" data-i18n="menu.levels"></button><button class="big alt" id="bShop" data-i18n="menu.shop"></button><button class="big alt" id="bMenuGfx" data-i18n-title="title.settings">⚙</button>
+  </div>
+</div>
+<div id="hint"></div>
+<div id="tut"><div class="trail"></div><div class="finger">👆</div></div>
+<div id="mLose" class="modal"><div class="card"><h2 id="loseTitle" data-i18n="lose.title"></h2><p id="loseText" data-i18n="lose.text"></p><button class="big" id="bContinue" data-i18n="lose.continue"></button></div></div>
+<div id="mWin" class="modal"><div class="card"><h2 data-i18n="win.title"></h2><div class="stars" id="winStars"><span>⭐</span><span>⭐</span><span>⭐</span></div><p id="winText"></p><button class="big" id="bNext" data-i18n="win.next"></button><button class="big alt" id="bRetry" data-i18n="win.retry"></button><button class="big alt" id="bWinMenu" data-i18n="win.menu"></button></div></div>
+<div id="mPause" class="modal"><div class="card"><h2 data-i18n="pause.title"></h2><p data-i18n="pause.text"></p><button class="big" id="bResume" data-i18n="pause.resume"></button><button class="big alt" id="bMenu" data-i18n="pause.menu"></button></div></div>
+<div id="mLevels" class="modal"><div class="card"><h2 data-i18n="levels.title"></h2><div class="levels" id="levelList"></div><button class="big alt" id="bLevelsClose" data-i18n="levels.close"></button></div></div>
+<div id="gfx"></div>
+<div id="shop"></div>
+<div id="loading"><div style="text-align:center"><h1>Lantern Ride</h1><p style="opacity:.7;margin:4px 0 0" data-i18n="loading">Charging the flashlight…</p><div class="lbar"><div id="lprog"></div></div></div></div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
